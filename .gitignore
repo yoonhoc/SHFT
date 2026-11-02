@@ -1,0 +1,24 @@
+# Author repositories (cloned as in third_party/README.md)
+third_party/SWE-QA-Pro/
+third_party/SWE-QA-Bench/
+third_party/budget-aware-agent/
+
+# Run outputs
+**/out/
+**/out_legacy/
+!build-dataset/questions/out/
+build-dataset/questions/out/*
+!build-dataset/questions/out/split.json
+train/sft/sftdata/
+wandb/
+*.log
+
+# Keys
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/

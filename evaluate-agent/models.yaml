@@ -1,0 +1,68 @@
+# 평가에 쓰는 에이전트 모델 설정. 형식은 저자 configs/models.yaml 그대로이고 run_agent.py 가 읽는다.
+# model_id 는 학습 전 원본이다. 학습한 모델은 같은 키에 run_agent.py 로 준다:
+#   --adapter <checkpoint>     어댑터를 vLLM LoRA 로 얹는다 (Qwen3). bf16 으로 합치면 어댑터가 더하는 값이 반올림으로 많이 사라진다
+# adapter: false 는 run_agent.py 만 읽는 값이다 (--adapter 를 막는다).
+
+defaults:   # 저자 기본값 그대로
+  temperature: 0.0
+  max_context_length: 32768
+  max_iterations: 25
+  history_window: 25
+  context_warning_threshold: 0.825
+
+models:
+  qwen3-8b:   # 저자 qwen3-8b 그대로, 도구 호출 상한만 30
+    provider: vllm-local
+    model_id: Qwen/Qwen3-8B
+    max_iterations: 30
+    vllm:
+      tensor_parallel_size: 1
+      max_model_len: 32768
+      gpu_memory_utilization: 0.90
+      dtype: bfloat16
+      max_num_seqs: 64
+      max_num_batched_tokens: 8192
+      enable_chunked_prefill: true
+    agent_vllm:
+      enable_auto_tool_choice: true
+      tool_call_parser: hermes
+
+  qwen3-8b-nothink:   # qwen3-8b 와 같되 생각 모드를 끈 것. 2026-10-10 부터 Qwen3 의 롤아웃·평가는 모두 이 키 (Qwen3 가 도구 턴에서
+    provider: vllm-local   #   <think> 를 열고 닫지 않는 버릇이 학습 템플릿과 안 맞아서). qwen3-8b(생각 켬)는 옛 판(out_legacy) 비교용
+    model_id: Qwen/Qwen3-8B
+    max_iterations: 30
+    vllm:
+      tensor_parallel_size: 1
+      max_model_len: 32768
+      gpu_memory_utilization: 0.90
+      dtype: bfloat16
+      max_num_seqs: 64
+      max_num_batched_tokens: 8192
+      enable_chunked_prefill: true
+      default_chat_template_kwargs: '{"enable_thinking": false}'
+    agent_vllm:
+      enable_auto_tool_choice: true
+      tool_call_parser: hermes
+
+  ministral-8b:   # 저자 devstral-24b 설정을 8B 한 장에 맞춘 것 (mistral parser). Mistral 의 공식 BF16 배포본 (기본 배포본은 FP8). 이미지 입력은 끈다
+    provider: vllm-local
+    model_id: mistralai/Ministral-3-8B-Instruct-2512-BF16
+    max_iterations: 30
+    vllm:
+      tensor_parallel_size: 1
+      max_model_len: 32768
+      gpu_memory_utilization: 0.90
+      dtype: bfloat16
+      max_num_seqs: 64
+      max_num_batched_tokens: 8192
+      enable_chunked_prefill: true
+      limit_mm_per_prompt: '{"image": 0}'
+      # 공식 저장소에는 consolidated.safetensors 가 있어 vLLM 이 자동으로 mistral_common tokenizer 모드를 고른다. 그 모드는 대화 기록을
+      # 엄격히 검사해(assistant 로 끝나는 기록, 함수 이름 검사) 저자 scaffold 요청의 15% 를 400 으로 거절했다 (2026-10-11).
+      # HF 모드로 고정하되, transformers 가 공식 tokenizer 를 잘못 열므로(글을 잘못 자르고 공백을 잃음) train/mistral_tokenizer.py 가
+      # 저장한 폴더를 준다. 학습도 같은 폴더를 쓴다 (train/README.md)
+      tokenizer_mode: hf
+      tokenizer: ../train/out/ministral-8b-tokenizer
+    agent_vllm:
+      enable_auto_tool_choice: true
+      tool_call_parser: mistral
